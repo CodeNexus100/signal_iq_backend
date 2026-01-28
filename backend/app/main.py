@@ -28,6 +28,16 @@ MAX_VEHICLES = 20
 MIN_SPEED = 10.0  # km/h
 MAX_QUEUE = 10
 
+# Signal timing constants
+BASE_GREEN_TIME = 30  # seconds
+MIN_GREEN_TIME = 15  # seconds
+MAX_GREEN_TIME = 60  # seconds
+CONGESTION_GREEN_EXTENSION = 15  # seconds
+CYCLE_TIME = 90  # seconds (for computing red_time)
+
+# In-memory per-intersection signal timing state
+signal_timing_state: Dict[str, dict] = {}
+
 
 class TrafficUpdate(BaseModel):
     """Traffic update payload model."""
@@ -91,6 +101,9 @@ async def update_traffic(update: TrafficUpdate):
     elif was_congested and not is_congested:
         logger.info("Congestion cleared at intersection_id=%s", intersection_id)
 
+    # Update signal timing whenever congestion status changes
+    _update_signal_timing(intersection_id, is_congested)
+
     # Log the received update as well
     logger.info(
         "Traffic update received: intersection_id=%s, timestamp=%s, "
@@ -124,4 +137,51 @@ async def get_congestion(intersection_id: str):
     return {
         "intersection_id": intersection_id,
         "congested": congested,
+    }
+
+
+def _update_signal_timing(intersection_id: str, is_congested: bool):
+    """Compute and update signal timing for an intersection based on congestion status."""
+    # Compute base green time
+    if is_congested:
+        green_time = BASE_GREEN_TIME + CONGESTION_GREEN_EXTENSION
+    else:
+        green_time = BASE_GREEN_TIME
+
+    # Enforce safety bounds
+    green_time = max(MIN_GREEN_TIME, min(green_time, MAX_GREEN_TIME))
+
+    # Compute red time (cycle time minus green time)
+    red_time = CYCLE_TIME - green_time
+
+    # Store signal timing state
+    signal_timing_state[intersection_id] = {
+        "green_time": green_time,
+        "red_time": red_time,
+    }
+
+    # Log timing decision
+    logger.info(
+        "Signal timing updated: intersection_id=%s, congested=%s, green_time=%s, red_time=%s",
+        intersection_id,
+        is_congested,
+        green_time,
+        red_time,
+    )
+
+
+@app.get("/traffic/signal/{intersection_id}")
+async def get_signal_timing(intersection_id: str):
+    """Return the signal timing for an intersection or 404 if not found."""
+    if intersection_id not in traffic_state:
+        raise HTTPException(status_code=404, detail="Intersection state not found")
+
+    timing = signal_timing_state.get(intersection_id)
+    if timing is None:
+        raise HTTPException(status_code=404, detail="Signal timing not found")
+
+    return {
+        "intersection_id": intersection_id,
+        "green_time": timing["green_time"],
+        "red_time": timing["red_time"],
     }
