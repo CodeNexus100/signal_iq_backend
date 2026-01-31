@@ -3,6 +3,9 @@ from typing import Dict, List
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, StrictFloat, StrictInt
+from fastapi.middleware.cors import CORSMiddleware
+
+
 
 # Configure logging
 logging.basicConfig(
@@ -13,6 +16,14 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(title="SignalIQ", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # React dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # In-memory storage for raw traffic updates
 traffic_data: List[dict] = []
