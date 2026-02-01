@@ -2,6 +2,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from typing import List
+from fastapi.middleware.cors import CORSMiddleware
 
 from fastapi import FastAPI, HTTPException, Body
 from .database import get_database, close_database_connection
@@ -39,6 +40,19 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # Include Routers
 app.include_router(traffic_routes.router, prefix="/traffic", tags=["Traffic"])
