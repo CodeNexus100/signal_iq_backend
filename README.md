@@ -161,18 +161,126 @@ _No emergency handling yet_
 
 ---
 
-### Section 10 — Distributed Coordination (Anti-Gridlock)
+# Section 10 — Multi-Intersection Signal Coordination (Green-Wave Engine)
 
-**Goal:** Prevent city-wide jams without central control
+## Goal
 
-- Neighbor-aware backpressure handling
-- Reduce green when downstream blocked
-- Hold upstream flow when necessary
-- Implicit coordination via shared state
+Section 10 introduces **multi-intersection coordination** to SignalIQ, enabling upstream traffic signals to adapt their active signal axis based on downstream congestion and blockage. This prevents spillback, improves traffic flow continuity, and makes the system behavior realistic and city-scale.
 
-_No global optimizer_
+- This section builds on **Sections 7–9**
+- Does **not modify the frontend contract**
 
 ---
+
+## Motivation
+
+### Without coordination
+
+- Each intersection operates independently
+- Congestion propagates upstream
+- Vehicles stop frequently, causing spillback and gridlock
+
+### With coordination
+
+- Upstream intersections react to downstream conditions
+- Green waves form naturally
+- Spillback is prevented
+- Signal behavior becomes explainable and realistic
+
+---
+
+## Design Principles
+
+- Backend-only logic (frontend remains passive)
+- Deterministic and graph-safe
+- No timers, no background loops
+- No frontend inference
+- No database persistence
+- No API contract changes
+- Backend remains the single source of truth
+
+---
+
+## Inputs Used
+
+Section 10 reuses existing backend components:
+
+- Topology graph (Section 1)
+- Intersection aggregation (Section 7)
+- Congestion detection, including `downstream_blocked` (Section 8)
+- Local signal timing and phase state (Section 9)
+
+---
+
+## Coordination Logic (Ordered Rules)
+
+### Rule 1 — Downstream Block Dominance (Highest Priority)
+
+If **any downstream intersection** is marked as `downstream_blocked = true`,  
+the upstream intersection **inherits the downstream intersection’s `active_axis`**.
+
+**Purpose:** Prevent spillback and gridlock.
+
+---
+
+### Rule 2 — Green-Wave Alignment
+
+If a downstream intersection:
+
+- Is directly connected
+- Has an active signal axis (`X` or `Z`)
+- And the road from the current intersection feeds that axis
+
+Then **align the upstream intersection’s `active_axis`** to match.
+
+**Purpose:** Enable smooth vehicle platoons across multiple intersections.
+
+---
+
+### Rule 3 — Local Default (Fallback)
+
+If no coordination rule applies, retain the **local `active_axis`** computed in Section 9.
+
+---
+
+## Phase Stability Rules
+
+- `active_axis` must not toggle automatically
+- Phase must persist across requests
+- Coordination may override phase **only when rules apply**
+- Otherwise, the phase remains unchanged
+
+---
+
+### Logging
+
+[SignalCoordination]
+intersection=I11
+reason=DOWNSTREAM_BLOCKED
+inherited_from=I12
+active_axis=X
+
+## API Contract (Unchanged)
+
+### Endpoint
+
+- GET /traffic/signal/{intersection_id}
+
+### Response
+
+```json
+{
+  "intersection_id": "I11",
+  "active_axis": "X",
+  "green_time": 15,
+  "red_time": 75,
+  "level": "HIGH",
+  "downstream_blocked": true
+}
+
+---
+
+
 
 ### Section 11 — Emergency Vehicle Priority (Green Corridor)
 
@@ -232,3 +340,4 @@ _Normal optimization resumes automatically_
 - Graph logic must use `roads.from → roads.to`
 - Every decision must be logged with a reason
 - If scope is unclear, STOP and ask
+```

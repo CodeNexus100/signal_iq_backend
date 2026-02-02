@@ -1,6 +1,6 @@
 """Graph-aware congestion detection. Reads from topology and traffic_state, no writes."""
 import logging
-from typing import List
+from typing import Dict, List, Tuple
 
 from fastapi import APIRouter, HTTPException
 
@@ -18,6 +18,10 @@ TRAFFIC_STATE_COLL = "traffic_state"
 LOAD_LOW_MAX = 10
 LOAD_MEDIUM_MAX = 30
 # load_score >= LOAD_MEDIUM_MAX -> HIGH
+
+# In-memory cache: intersection_id -> (level, downstream_blocked)
+# Only log when level OR downstream_blocked changes.
+_congestion_state_cache: Dict[str, Tuple[CongestionLevel, bool]] = {}
 
 
 def _db():
@@ -118,15 +122,19 @@ async def get_congestion(intersection_id: str) -> CongestionResponse:
     level = _escalate(base_level) if downstream_blocked else base_level
     escalated = level != base_level
 
-    logger.info(
-        "Congestion: intersection_id=%s, base_level=%s, level=%s, escalated=%s, downstream_blocked=%s, load_score=%s",
-        intersection_id,
-        base_level.value,
-        level.value,
-        escalated,
-        downstream_blocked,
-        load_score,
-    )
+    # Only log when level OR downstream_blocked changes
+    prev = _congestion_state_cache.get(intersection_id)
+    if prev is None or prev[0] != level or prev[1] != downstream_blocked:
+        _congestion_state_cache[intersection_id] = (level, downstream_blocked)
+        logger.info(
+            "Congestion: intersection_id=%s, base_level=%s, level=%s, escalated=%s, downstream_blocked=%s, load_score=%s",
+            intersection_id,
+            base_level.value,
+            level.value,
+            escalated,
+            downstream_blocked,
+            load_score,
+        )
 
     return CongestionResponse(
         intersection_id=intersection_id,
