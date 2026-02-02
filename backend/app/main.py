@@ -7,7 +7,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Body
 from .database import get_database, close_database_connection
 from .models import UserCreate, UserResponse, hash_password
-from . import traffic_routes, user_routes
+from . import (
+    traffic_routes,
+    user_routes,
+    road_traffic_routes,
+    intersection_aggregation_routes,
+    topology_routes,
+    congestion_routes,
+    signal_routes,
+)
+
 
 # Configure logging
 logging.basicConfig(
@@ -56,7 +65,13 @@ app.add_middleware(
 
 # Include Routers
 app.include_router(traffic_routes.router, prefix="/traffic", tags=["Traffic"])
+app.include_router(road_traffic_routes.router, prefix="/traffic", tags=["Road Traffic"])
+app.include_router(intersection_aggregation_routes.router, prefix="/traffic", tags=["Intersection Aggregation"])
+app.include_router(congestion_routes.router, prefix="/traffic", tags=["Congestion"])
+app.include_router(signal_routes.router, prefix="/traffic", tags=["Signal"])
 app.include_router(user_routes.router, prefix="/auth", tags=["auth"])
+app.include_router(topology_routes.router, prefix="/topology", tags=["Topology"])
+
 
 @app.get("/health", tags=["Health"])
 async def health():

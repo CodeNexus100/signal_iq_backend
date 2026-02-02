@@ -5,6 +5,14 @@ They are non-negotiable and must be followed strictly.
 
 ---
 
+- Implement ONLY the current section
+- Do NOT touch completed sections
+- Do NOT refactor unless required
+- MongoDB is the authoritative datastore
+- Graph logic must use roads.from → roads.to
+- Every decision must be logged with reason
+- If scope is unclear, STOP
+
 ## 1. Core Development Principles
 
 - Build incrementally. Never generate the full project in one step.
@@ -79,6 +87,7 @@ They are non-negotiable and must be followed strictly.
 ## 8. Incremental Workflow (Mandatory)
 
 For each section:
+
 1. Implement only the required features
 2. Write high-level tests
 3. Run tests
